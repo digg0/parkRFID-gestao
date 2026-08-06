@@ -1,36 +1,21 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
-import 'features/sessions/presentation/screens/tela_checkin.dart';
+import 'features/home/presentation/screens/main_navigation_screen.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-
-
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    debugPrint('ERRO DO FLUTTER: ${details.exception}');
-  };
-
-
-  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-    debugPrint('ERRO ASSÍNCRONO: $error');
-    return true;
-  };
-
-  runApp(const ParqueApp());
+  runApp(const MyApp());
 }
 
-class ParqueApp extends StatelessWidget {
-  const ParqueApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Parque RFID',
+      title: 'Aquapark Admin',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const TelaCheckinMobile(),
+      home: const MainNavigationScreen(),
     );
   }
 }
