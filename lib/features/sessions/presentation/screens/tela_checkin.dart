@@ -85,29 +85,89 @@ class _TelaCheckinState extends State<TelaCheckin> {
   }
 
   String? _extractTagId(NfcTag tag) {
-    final rawData = tag.data;
-    List<int>? identifier;
+    try {
+      final rawData = tag.data;
 
-    if (rawData is Map) {
-      for (final tech in ['nfca', 'mifare', 'isodep', 'ndef', 'nfcb', 'nfcf', 'nfcv']) {
-        if (rawData.containsKey(tech) && rawData[tech] is Map) {
-          final techMap = rawData[tech] as Map;
-          if (techMap.containsKey('identifier') && techMap['identifier'] is List) {
-            identifier = List<int>.from(techMap['identifier']);
-            break;
-          }
+      if (rawData is Map) {
+        return _extractFromMap(rawData);
+      }
+
+      try {
+        final dynamic dynamicData = tag.data;
+
+        if (dynamicData.id != null) {
+          final idBytes = List<int>.from(dynamicData.id);
+          return _bytesToHex(idBytes);
+        }
+        if (dynamicData.identifier != null) {
+          final idBytes = List<int>.from(dynamicData.identifier);
+          return _bytesToHex(idBytes);
+        }
+      } catch (_) {}
+
+      try {
+        final possibleKeys = [
+          'nfca',
+          'mifareclassic',
+          'mifare',
+          'isodep',
+          'ndef',
+          'nfcb',
+          'nfcf',
+          'nfcv'
+        ];
+
+        for (final key in possibleKeys) {
+          try {
+            final techData = (tag.data as dynamic)[key];
+            if (techData != null) {
+              if (techData['identifier'] != null) {
+                return _bytesToHex(List<int>.from(techData['identifier']));
+              }
+              if (techData.identifier != null) {
+                return _bytesToHex(List<int>.from(techData.identifier));
+              }
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
+    } catch (_) {}
+    return null;
+  }
+
+  String _bytesToHex(List<int> bytes) {
+    return bytes
+        .map((e) => e.toRadixString(16).padLeft(2, '0'))
+        .join()
+        .toUpperCase();
+  }
+
+  String? _extractFromMap(Map data) {
+    for (final tech in [
+      'nfca',
+      'mifareclassic',
+      'mifareultralight',
+      'mifare',
+      'isodep',
+      'ndef',
+      'nfcb',
+      'nfcf',
+      'nfcv'
+    ]) {
+      if (data.containsKey(tech) && data[tech] is Map) {
+        final techMap = data[tech] as Map;
+        if (techMap.containsKey('identifier') &&
+            techMap['identifier'] is List) {
+          return _bytesToHex(List<int>.from(techMap['identifier']));
         }
       }
-    }
-
-    if (identifier != null && identifier.isNotEmpty) {
-      return identifier.map((e) => e.toRadixString(16).padLeft(2, '0')).join().toUpperCase();
     }
     return null;
   }
 
   void _handleCreateGroup() {
-    if (_cpfController.text.trim().isEmpty || _phoneController.text.trim().isEmpty) {
+    if (_cpfController.text.trim().isEmpty ||
+        _phoneController.text.trim().isEmpty) {
       _showErrorDialog('Preencha o CPF e o Telefone do responsável.');
       return;
     }
@@ -147,7 +207,8 @@ class _TelaCheckinState extends State<TelaCheckin> {
   void _removeBracelet(int index) {
     setState(() {
       _readBracelets.removeAt(index);
-      if (_readBracelets.isNotEmpty && !_readBracelets.any((b) => b['isLeader'] == 'true')) {
+      if (_readBracelets.isNotEmpty &&
+          !_readBracelets.any((b) => b['isLeader'] == 'true')) {
         _readBracelets[0]['isLeader'] = 'true';
       }
     });
@@ -170,7 +231,11 @@ class _TelaCheckinState extends State<TelaCheckin> {
       dynamic realGroupId;
       if (groupResponse.data is Map) {
         final map = groupResponse.data as Map;
-        realGroupId = map['id'] ?? map['groupId'] ?? map['sessionGroupId'] ?? map['sessionGroup']?['id'] ?? map['data']?['id'];
+        realGroupId = map['id'] ??
+            map['groupId'] ??
+            map['sessionGroupId'] ??
+            map['sessionGroup']?['id'] ??
+            map['data']?['id'];
       } else if (groupResponse.data is String) {
         realGroupId = groupResponse.data;
       }
@@ -199,7 +264,8 @@ class _TelaCheckinState extends State<TelaCheckin> {
         _resetFlow();
       }
     } on DioException catch (e) {
-      final message = e.response?.data?['message'] ?? e.message ?? 'Erro ao finalizar check-in';
+      final message =
+          e.response?.data?['message'] ?? e.message ?? 'Erro ao finalizar check-in';
       _showErrorDialog(message);
     } catch (e) {
       _showErrorDialog('Erro ao finalizar check-in: $e');
@@ -213,7 +279,9 @@ class _TelaCheckinState extends State<TelaCheckin> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Digitar código da pulseira', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        title: Text('Digitar código da pulseira',
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold)),
         content: TextField(
           controller: _manualTagController,
           autofocus: true,
@@ -230,7 +298,8 @@ class _TelaCheckinState extends State<TelaCheckin> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancelar', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+            child: Text('Cancelar',
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -254,12 +323,16 @@ class _TelaCheckinState extends State<TelaCheckin> {
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text('Atenção', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Text('Atenção',
+              style: TextStyle(fontWeight: FontWeight.bold)),
           content: Text(message),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('OK', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+              child: Text('OK',
+                  style: TextStyle(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold)),
             )
           ],
         ),
@@ -288,8 +361,6 @@ class _TelaCheckinState extends State<TelaCheckin> {
       body: SafeArea(
         child: Column(
           children: [
-
-
             Container(
               color: colorScheme.primary,
               width: double.infinity,
@@ -302,8 +373,6 @@ class _TelaCheckinState extends State<TelaCheckin> {
                 ),
               ),
             ),
-
-
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20.0),
@@ -325,15 +394,15 @@ class _TelaCheckinState extends State<TelaCheckin> {
                       ),
                     ),
                     const SizedBox(height: 20),
-
                     if (!_isGroupActive) ...[
-                      // CARD FORMULÁRIO "NOVO CHECK-IN"
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: colorScheme.surface,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+                          border: Border.all(
+                              color: colorScheme.outlineVariant
+                                  .withOpacity(0.5)),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.04),
@@ -360,12 +429,14 @@ class _TelaCheckinState extends State<TelaCheckin> {
                               decoration: InputDecoration(
                                 hintText: '000.000.000-0',
                                 filled: true,
-                                fillColor: colorScheme.surfaceContainerHighest,
+                                fillColor:
+                                colorScheme.surfaceContainerHighest,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
                                 ),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -383,12 +454,14 @@ class _TelaCheckinState extends State<TelaCheckin> {
                               decoration: InputDecoration(
                                 hintText: '(00) 00000-0000',
                                 filled: true,
-                                fillColor: colorScheme.surfaceContainerHighest,
+                                fillColor:
+                                colorScheme.surfaceContainerHighest,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
                                 ),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
                               ),
                             ),
                             const SizedBox(height: 24),
@@ -400,14 +473,22 @@ class _TelaCheckinState extends State<TelaCheckin> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: colorScheme.primary,
                                   foregroundColor: colorScheme.onPrimary,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                      BorderRadius.circular(12)),
                                   elevation: 0,
                                 ),
                                 child: const Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Text('+ ', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                                    Text('Criar grupo', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                    Text('+ ',
+                                        style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold)),
+                                    Text('Criar grupo',
+                                        style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold)),
                                   ],
                                 ),
                               ),
@@ -416,7 +497,6 @@ class _TelaCheckinState extends State<TelaCheckin> {
                         ),
                       ),
                     ] else ...[
-
                       Container(
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
@@ -429,14 +509,19 @@ class _TelaCheckinState extends State<TelaCheckin> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: colorScheme.onPrimaryContainer.withOpacity(0.1),
+                                    color: colorScheme.onPrimaryContainer
+                                        .withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Row(
                                     children: [
-                                      const CircleAvatar(radius: 4, backgroundColor: Colors.lightGreenAccent),
+                                      const CircleAvatar(
+                                          radius: 4,
+                                          backgroundColor:
+                                          Colors.lightGreenAccent),
                                       const SizedBox(width: 6),
                                       Text(
                                         'Grupo aberto',
@@ -452,15 +537,23 @@ class _TelaCheckinState extends State<TelaCheckin> {
                                 OutlinedButton(
                                   onPressed: _resetFlow,
                                   style: OutlinedButton.styleFrom(
-                                    side: BorderSide(color: colorScheme.error, width: 1.5),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                                    side: BorderSide(
+                                        color: colorScheme.error, width: 1.5),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                        BorderRadius.circular(10)),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 18, vertical: 10),
                                     minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
                                   ),
                                   child: Text(
                                     'Cancelar',
-                                    style: TextStyle(color: colorScheme.error, fontSize: 14, fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                        color: colorScheme.error,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],
@@ -473,12 +566,21 @@ class _TelaCheckinState extends State<TelaCheckin> {
                                   children: [
                                     Text(
                                       'CPF',
-                                      style: TextStyle(color: colorScheme.onPrimaryContainer.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.bold),
+                                      style: TextStyle(
+                                          color: colorScheme
+                                              .onPrimaryContainer
+                                              .withOpacity(0.6),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       _cpfController.text,
-                                      style: TextStyle(color: colorScheme.onPrimaryContainer, fontSize: 15, fontWeight: FontWeight.bold),
+                                      style: TextStyle(
+                                          color:
+                                          colorScheme.onPrimaryContainer,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                   ],
                                 ),
@@ -488,12 +590,21 @@ class _TelaCheckinState extends State<TelaCheckin> {
                                   children: [
                                     Text(
                                       'TELEFONE',
-                                      style: TextStyle(color: colorScheme.onPrimaryContainer.withOpacity(0.6), fontSize: 10, fontWeight: FontWeight.bold),
+                                      style: TextStyle(
+                                          color: colorScheme
+                                              .onPrimaryContainer
+                                              .withOpacity(0.6),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       _phoneController.text,
-                                      style: TextStyle(color: colorScheme.onPrimaryContainer, fontSize: 15, fontWeight: FontWeight.bold),
+                                      style: TextStyle(
+                                          color:
+                                          colorScheme.onPrimaryContainer,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold),
                                     ),
                                   ],
                                 ),
@@ -503,40 +614,58 @@ class _TelaCheckinState extends State<TelaCheckin> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
-
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: colorScheme.primary.withOpacity(0.3), width: 1.5),
+                          border: Border.all(
+                              color: colorScheme.primary.withOpacity(0.3),
+                              width: 1.5),
                         ),
                         child: Row(
                           children: [
                             Expanded(
                               child: GestureDetector(
-                                onTap: () => setState(() => _selectedType = 'NORMAL'),
+                                onTap: () =>
+                                    setState(() => _selectedType = 'NORMAL'),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 12),
                                   decoration: BoxDecoration(
-                                    color: _selectedType == 'NORMAL' ? colorScheme.surface : Colors.transparent,
+                                    color: _selectedType == 'NORMAL'
+                                        ? colorScheme.surface
+                                        : Colors.transparent,
                                     borderRadius: BorderRadius.circular(8),
                                     boxShadow: _selectedType == 'NORMAL'
-                                        ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
+                                        ? [
+                                      BoxShadow(
+                                          color: Colors.black
+                                              .withOpacity(0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2))
+                                    ]
                                         : [],
                                   ),
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisAlignment:
+                                    MainAxisAlignment.center,
                                     children: [
-                                      CircleAvatar(radius: 4, backgroundColor: _selectedType == 'NORMAL' ? colorScheme.primary : Colors.transparent),
+                                      CircleAvatar(
+                                          radius: 4,
+                                          backgroundColor:
+                                          _selectedType == 'NORMAL'
+                                              ? colorScheme.primary
+                                              : Colors.transparent),
                                       const SizedBox(width: 8),
                                       Text(
                                         'Normal',
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
-                                          color: _selectedType == 'NORMAL' ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                                          color: _selectedType == 'NORMAL'
+                                              ? colorScheme.primary
+                                              : colorScheme.onSurfaceVariant,
                                         ),
                                       ),
                                     ],
@@ -546,27 +675,45 @@ class _TelaCheckinState extends State<TelaCheckin> {
                             ),
                             Expanded(
                               child: GestureDetector(
-                                onTap: () => setState(() => _selectedType = 'KID'),
+                                onTap: () =>
+                                    setState(() => _selectedType = 'KID'),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 12),
                                   decoration: BoxDecoration(
-                                    color: _selectedType == 'KID' ? colorScheme.surface : Colors.transparent,
+                                    color: _selectedType == 'KID'
+                                        ? colorScheme.surface
+                                        : Colors.transparent,
                                     borderRadius: BorderRadius.circular(8),
                                     boxShadow: _selectedType == 'KID'
-                                        ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2))]
+                                        ? [
+                                      BoxShadow(
+                                          color: Colors.black
+                                              .withOpacity(0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2))
+                                    ]
                                         : [],
                                   ),
                                   child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisAlignment:
+                                    MainAxisAlignment.center,
                                     children: [
-                                      CircleAvatar(radius: 4, backgroundColor: _selectedType == 'KID' ? colorScheme.primary : Colors.transparent),
+                                      CircleAvatar(
+                                          radius: 4,
+                                          backgroundColor:
+                                          _selectedType == 'KID'
+                                              ? colorScheme.primary
+                                              : Colors.transparent),
                                       const SizedBox(width: 8),
                                       Text(
                                         'Kid',
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.bold,
-                                          color: _selectedType == 'KID' ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                                          color: _selectedType == 'KID'
+                                              ? colorScheme.primary
+                                              : colorScheme.onSurfaceVariant,
                                         ),
                                       ),
                                     ],
@@ -578,57 +725,66 @@ class _TelaCheckinState extends State<TelaCheckin> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
-
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
                           color: colorScheme.primary.withOpacity(0.08),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
+                          border: Border.all(
+                              color: colorScheme.primary.withOpacity(0.2)),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.nfc_rounded, color: colorScheme.primary, size: 22),
+                            Icon(Icons.nfc_rounded,
+                                color: colorScheme.primary, size: 22),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 _readBracelets.isEmpty
                                     ? 'Leitor NFC ativo — Aproxime a pulseira do LÍDER'
                                     : 'Leitor NFC ativo — Aproxime a próxima pulseira',
-                                style: TextStyle(fontSize: 13, color: colorScheme.primary, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w600),
                               ),
                             ),
                             if (_isNfcActive)
                               SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary),
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: colorScheme.primary),
                               ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 12),
-
-
                       Center(
                         child: TextButton.icon(
                           onPressed: _showManualEntryDialog,
-                          icon: Icon(Icons.keyboard_outlined, color: colorScheme.primary, size: 18),
+                          icon: Icon(Icons.keyboard_outlined,
+                              color: colorScheme.primary, size: 18),
                           label: Text(
                             'Digitar código manualmente',
-                            style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 14),
+                            style: TextStyle(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14),
                           ),
                         ),
                       ),
                       const SizedBox(height: 16),
-
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: colorScheme.surface,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+                          border: Border.all(
+                              color: colorScheme.outlineVariant
+                                  .withOpacity(0.5)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -653,7 +809,10 @@ class _TelaCheckinState extends State<TelaCheckin> {
                                   ),
                                   child: Text(
                                     '${_readBracelets.length}',
-                                    style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13),
+                                    style: TextStyle(
+                                        color: colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13),
                                   ),
                                 ),
                               ],
@@ -662,70 +821,110 @@ class _TelaCheckinState extends State<TelaCheckin> {
                             if (_readBracelets.isEmpty)
                               Container(
                                 width: double.infinity,
-                                padding: const EdgeInsets.symmetric(vertical: 20),
+                                padding:
+                                const EdgeInsets.symmetric(vertical: 20),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
+                                  border: Border.all(
+                                      color: colorScheme.outline
+                                          .withOpacity(0.3)),
                                 ),
                                 child: Center(
                                   child: Text(
                                     'Nenhuma pulseira lida ainda.',
-                                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
+                                    style: TextStyle(
+                                        color: colorScheme.onSurfaceVariant,
+                                        fontSize: 13),
                                   ),
                                 ),
                               )
                             else
                               Column(
                                 children: [
-                                  for (int i = 0; i < _readBracelets.length; i++) ...[
+                                  for (int i = 0;
+                                  i < _readBracelets.length;
+                                  i++) ...[
                                     if (i > 0) const SizedBox(height: 8),
                                     Builder(
                                       builder: (context) {
                                         final item = _readBracelets[i];
-                                        final isLeader = item['isLeader'] == 'true';
+                                        final isLeader =
+                                            item['isLeader'] == 'true';
 
                                         return Container(
                                           decoration: BoxDecoration(
-                                            color: isLeader ? Colors.amber.shade50 : colorScheme.surfaceContainerHighest,
-                                            borderRadius: BorderRadius.circular(10),
-                                            border: isLeader ? Border.all(color: Colors.amber.shade300) : null,
+                                            color: isLeader
+                                                ? Colors.amber.shade50
+                                                : colorScheme
+                                                .surfaceContainerHighest,
+                                            borderRadius:
+                                            BorderRadius.circular(10),
+                                            border: isLeader
+                                                ? Border.all(
+                                                color:
+                                                Colors.amber.shade300)
+                                                : null,
                                           ),
                                           child: ListTile(
                                             dense: true,
                                             leading: Icon(
-                                              isLeader ? Icons.stars_rounded : Icons.style_rounded,
-                                              color: isLeader ? Colors.amber.shade800 : colorScheme.primary,
+                                              isLeader
+                                                  ? Icons.stars_rounded
+                                                  : Icons.style_rounded,
+                                              color: isLeader
+                                                  ? Colors.amber.shade800
+                                                  : colorScheme.primary,
                                               size: 24,
                                             ),
                                             title: Row(
                                               children: [
                                                 Text(
                                                   item['braceletId'] ?? '',
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                                  style: const TextStyle(
+                                                      fontWeight:
+                                                      FontWeight.bold,
+                                                      fontSize: 15),
                                                 ),
                                                 if (isLeader) ...[
                                                   const SizedBox(width: 8),
                                                   Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2),
                                                     decoration: BoxDecoration(
-                                                      color: Colors.amber.shade200,
-                                                      borderRadius: BorderRadius.circular(6),
+                                                      color:
+                                                      Colors.amber.shade200,
+                                                      borderRadius:
+                                                      BorderRadius.circular(
+                                                          6),
                                                     ),
                                                     child: Text(
                                                       'LÍDER',
-                                                      style: TextStyle(color: Colors.amber.shade900, fontSize: 10, fontWeight: FontWeight.bold),
+                                                      style: TextStyle(
+                                                          color: Colors
+                                                              .amber.shade900,
+                                                          fontSize: 10,
+                                                          fontWeight:
+                                                          FontWeight.bold),
                                                     ),
                                                   ),
                                                 ],
                                               ],
                                             ),
-                                            subtitle: Text('Tipo: ${item['type']}', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                                            subtitle: Text(
+                                                'Tipo: ${item['type']}',
+                                                style: TextStyle(
+                                                    color: colorScheme
+                                                        .onSurfaceVariant)),
                                             trailing: GestureDetector(
                                               onTap: () => _removeBracelet(i),
                                               child: Container(
-                                                padding: const EdgeInsets.all(8),
+                                                padding:
+                                                const EdgeInsets.all(8),
                                                 decoration: BoxDecoration(
-                                                  color: colorScheme.errorContainer,
+                                                  color: colorScheme
+                                                      .errorContainer,
                                                   shape: BoxShape.circle,
                                                 ),
                                                 child: Icon(
@@ -746,28 +945,38 @@ class _TelaCheckinState extends State<TelaCheckin> {
                         ),
                       ),
                       const SizedBox(height: 20),
-
-
                       SizedBox(
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: (_readBracelets.isEmpty || _isLoading) ? null : _finishCheckin,
+                          onPressed: (_readBracelets.isEmpty || _isLoading)
+                              ? null
+                              : _finishCheckin,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: colorScheme.primary,
                             foregroundColor: colorScheme.onPrimary,
-                            disabledBackgroundColor: colorScheme.primary.withOpacity(0.5),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            disabledBackgroundColor:
+                            colorScheme.primary.withOpacity(0.5),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
                             elevation: 0,
                           ),
                           child: _isLoading
-                              ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: colorScheme.onPrimary, strokeWidth: 2))
+                              ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  color: colorScheme.onPrimary,
+                                  strokeWidth: 2))
                               : const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.check, size: 20),
                               SizedBox(width: 8),
-                              Text('Finalizar check-in', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                              Text('Finalizar check-in',
+                                  style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
