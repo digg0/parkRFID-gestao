@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 
+import '../../../../core/api/api_client.dart';
+
 class TelaCheckin extends StatefulWidget {
   const TelaCheckin({super.key});
 
@@ -12,14 +14,7 @@ class TelaCheckin extends StatefulWidget {
 typedef TelaCheckinMobile = TelaCheckin;
 
 class _TelaCheckinState extends State<TelaCheckin> {
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: 'http://192.168.1.7:3333',
-      connectTimeout: const Duration(seconds: 5),
-      receiveTimeout: const Duration(seconds: 5),
-      headers: {'Content-Type': 'application/json'},
-    ),
-  );
+  final Dio _dio = ApiClient.dio;
 
   final _cpfController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -45,7 +40,11 @@ class _TelaCheckinState extends State<TelaCheckin> {
     final bool isAvailable = await NfcManager.instance.isAvailable();
 
     if (!isAvailable) {
-      _showErrorDialog('NFC indisponível ou desativado neste aparelho.');
+      if (mounted) {
+        setState(() => _isNfcActive = false);
+      }
+      _showErrorDialog(
+          'NFC indisponível ou desativado neste aparelho. Utilize a digitação manual de código.');
       return;
     }
 
@@ -725,29 +724,47 @@ class _TelaCheckinState extends State<TelaCheckin> {
                         ),
                       ),
                       const SizedBox(height: 16),
+                      // BANNER DINÂMICO DO NFC
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
-                          color: colorScheme.primary.withOpacity(0.08),
+                          color: _isNfcActive
+                              ? colorScheme.primary.withOpacity(0.08)
+                              : colorScheme.error.withOpacity(0.08),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: colorScheme.primary.withOpacity(0.2)),
+                            color: _isNfcActive
+                                ? colorScheme.primary.withOpacity(0.2)
+                                : colorScheme.error.withOpacity(0.3),
+                          ),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.nfc_rounded,
-                                color: colorScheme.primary, size: 22),
+                            Icon(
+                              _isNfcActive
+                                  ? Icons.nfc_rounded
+                                  : Icons.error_outline_rounded,
+                              color: _isNfcActive
+                                  ? colorScheme.primary
+                                  : colorScheme.error,
+                              size: 22,
+                            ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                _readBracelets.isEmpty
+                                _isNfcActive
+                                    ? (_readBracelets.isEmpty
                                     ? 'Leitor NFC ativo — Aproxime a pulseira do LÍDER'
-                                    : 'Leitor NFC ativo — Aproxime a próxima pulseira',
+                                    : 'Leitor NFC ativo — Aproxime a próxima pulseira')
+                                    : 'NFC Indisponível/Desativado — Digite o código abaixo',
                                 style: TextStyle(
-                                    fontSize: 13,
-                                    color: colorScheme.primary,
-                                    fontWeight: FontWeight.w600),
+                                  fontSize: 13,
+                                  color: _isNfcActive
+                                      ? colorScheme.primary
+                                      : colorScheme.error,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                             if (_isNfcActive)
@@ -755,8 +772,9 @@ class _TelaCheckinState extends State<TelaCheckin> {
                                 width: 16,
                                 height: 16,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: colorScheme.primary),
+                                  strokeWidth: 2,
+                                  color: colorScheme.primary,
+                                ),
                               ),
                           ],
                         ),

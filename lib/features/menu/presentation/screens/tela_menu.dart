@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/api/api_client.dart';
+
 class TelaMenu extends StatefulWidget {
   const TelaMenu({super.key});
 
@@ -10,17 +12,11 @@ class TelaMenu extends StatefulWidget {
 }
 
 class _TelaMenuState extends State<TelaMenu> {
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: 'http://192.168.1.7:3333',
-      connectTimeout: const Duration(seconds: 5),
-      receiveTimeout: const Duration(seconds: 5),
-      headers: {'Content-Type': 'application/json'},
-    ),
-  );
+  final Dio _dio = ApiClient.dio;
 
   List<dynamic> _menuItems = [];
   bool _isLoading = true;
+  bool _isApiOffline = false;
   String _selectedCategory = 'Todas';
 
   @override
@@ -30,7 +26,10 @@ class _TelaMenuState extends State<TelaMenu> {
   }
 
   Future<void> _fetchMenu() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _isApiOffline = false;
+    });
     try {
       String path = '/menu';
       if (_selectedCategory != 'Todas') {
@@ -42,14 +41,23 @@ class _TelaMenuState extends State<TelaMenu> {
         setState(() {
           _menuItems = response.data;
           _isLoading = false;
+          _isApiOffline = false;
         });
       }
-    } on DioException catch (e) {
-      setState(() => _isLoading = false);
-      _showErrorDialog(e.response?.data?['message'] ?? 'Erro ao carregar cardápio.');
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showErrorDialog('Erro inesperado: $e');
+    } on DioException catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isApiOffline = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isApiOffline = true;
+        });
+      }
     }
   }
 
@@ -198,7 +206,7 @@ class _TelaMenuState extends State<TelaMenu> {
       await _fetchMenu();
     } on DioException catch (e) {
       setState(() => _isLoading = false);
-      _showErrorDialog(e.response?.data?['message'] ?? 'Erro ao salvar item.');
+      _showErrorDialog(e.response?.data?['message'] ?? 'Erro ao conectar com a API ao salvar item.');
     }
   }
 
@@ -220,7 +228,7 @@ class _TelaMenuState extends State<TelaMenu> {
       setState(() {
         item['isAvaliable'] = !newValue;
       });
-      _showErrorDialog(e.response?.data?['message'] ?? 'Erro ao atualizar disponibilidade.');
+      _showErrorDialog(e.response?.data?['message'] ?? 'Erro de conexão com a API.');
     }
   }
 
@@ -335,6 +343,37 @@ class _TelaMenuState extends State<TelaMenu> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
+                  : _isApiOffline
+                  ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.wifi_off_rounded,
+                      size: 48,
+                      color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Conexão com a API desativada',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        _fetchMenu();
+                      },
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('Tentar novamente'),
+                    ),
+                  ],
+                ),
+              )
                   : _menuItems.isEmpty
                   ? const Center(child: Text('Nenhum item encontrado.'))
                   : ListView.builder(
