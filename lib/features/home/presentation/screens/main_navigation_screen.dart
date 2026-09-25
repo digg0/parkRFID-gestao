@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:rfidparque/features/bracelets/presentation/screens/tela_gestao_pulseiras.dart';
 import 'package:rfidparque/features/menu/presentation/screens/tela_menu.dart';
 import '../../../sessions/presentation/screens/tela_checkin.dart';
 
@@ -16,6 +17,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final List<Widget> _screens = [
     const TelaCheckin(),
     const Center(child: Text('Tela de Sessões')),
+    const TelaGestaoPulseiras(),
     const TelaMenu(),
   ];
 
@@ -32,6 +34,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (int index) {
           HapticFeedback.lightImpact();
+          if (_currentIndex == 2 && index != 2) {
+            TelaGestaoPulseiras.resetarFluxo();
+          }
           setState(() {
             _currentIndex = index;
           });
@@ -48,6 +53,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             icon: const Icon(Icons.confirmation_number_outlined),
             selectedIcon: Icon(Icons.confirmation_number, color: colorScheme.primary),
             label: 'Sessões',
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.confirmation_number_outlined),
+            selectedIcon: Icon(Icons.add, color: colorScheme.primary),
+            label: 'Cadastro Pu',
           ),
           NavigationDestination(
             icon: const Icon(Icons.restaurant_menu_outlined),

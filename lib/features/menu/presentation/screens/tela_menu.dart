@@ -68,86 +68,189 @@ class _TelaMenuState extends State<TelaMenu> {
     final priceController = TextEditingController(text: itemToEdit?['price']?.toString() ?? '');
     bool isAvaliable = itemToEdit?['isAvaliable'] ?? true;
 
-    await showDialog(
+    bool hasErrorName = false;
+    bool hasErrorCategory = false;
+    bool hasErrorPrice = false;
+
+    await showGeneralDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(isEditing ? 'Editar Item' : 'Novo Item do Cardápio'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Nome do Item'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: categoryController,
-                  decoration: const InputDecoration(labelText: 'Categoria (ex: Bebidas, Comidas)'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: priceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Preço (ex: 7,00)'),
-                ),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  title: const Text('Disponível'),
-                  value: isAvaliable,
-                  onChanged: (val) {
-                    HapticFeedback.lightImpact();
-                    setDialogState(() => isAvaliable = val);
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            if (isEditing)
-              TextButton(
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.pop(context);
-                  _confirmDelete(itemToEdit['id']);
-                },
-                child: const Text('Excluir', style: TextStyle(color: Colors.red)),
-              ),
-            TextButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                Navigator.pop(context);
-              },
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                HapticFeedback.lightImpact();
-                final name = nameController.text.trim();
-                final category = categoryController.text.trim();
-                final price = priceController.text.trim();
+      barrierDismissible: true,
+      barrierLabel: 'Fechar',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return const SizedBox.shrink();
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        // Animação de entrada suave (fade + scale leve)
+        final curvedAnimation = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        );
 
-                if (name.isEmpty || category.isEmpty || price.isEmpty) {
-                  _showErrorDialog('Preencha todos os campos obrigatórios.');
-                  return;
-                }
+        return ScaleTransition(
+          scale: Tween<double>(begin: 0.95, end: 1.0).animate(curvedAnimation),
+          child: FadeTransition(
+            opacity: curvedAnimation,
+            child: StatefulBuilder(
+              builder: (context, setDialogState) {
+                final theme = Theme.of(context);
+                final colorScheme = theme.colorScheme;
+                // Pega a altura exata do teclado para empurrar o modal para cima sem esmagá-lo
+                final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
 
-                Navigator.pop(context);
-                await _submitItemData(
-                  id: itemToEdit?['id'],
-                  name: name,
-                  category: category,
-                  price: price,
-                  isAvaliable: isAvaliable,
-                  isEditing: isEditing,
+                return AlertDialog(
+                  insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  title: Text(
+                    isEditing ? 'Editar Item' : 'Novo Item do Cardápio',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  content: AnimatedPadding(
+                    duration: const Duration(milliseconds: 150),
+                    curve: Curves.easeOut,
+                    padding: EdgeInsets.only(bottom: keyboardHeight > 0 ? 10 : 0),
+                    child: SizedBox(
+                      width: MediaQuery.of(context).size.width,
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextField(
+                              controller: nameController,
+                              autofocus: true,
+                              textCapitalization: TextCapitalization.sentences,
+                              decoration: InputDecoration(
+                                labelText: 'Nome do Item',
+                                hintText: 'Ex: Refrigerante Lata',
+                                errorText: hasErrorName ? 'Campo obrigatório' : null,
+                                filled: true,
+                                fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            TextField(
+                              controller: categoryController,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: InputDecoration(
+                                labelText: 'Categoria',
+                                hintText: 'Ex: Bebidas, Comidas',
+                                errorText: hasErrorCategory ? 'Campo obrigatório' : null,
+                                filled: true,
+                                fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            TextField(
+                              controller: priceController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: InputDecoration(
+                                labelText: 'Preço (R\$)',
+                                hintText: '0,00',
+                                errorText: hasErrorPrice ? 'Informe um preço válido' : null,
+                                filled: true,
+                                fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: SwitchListTile(
+                                title: const Text('Disponível para venda', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                                value: isAvaliable,
+                                activeColor: colorScheme.primary,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                onChanged: (val) {
+                                  HapticFeedback.lightImpact();
+                                  setDialogState(() => isAvaliable = val);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  actions: [
+                    if (isEditing)
+                      TextButton(
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.pop(context);
+                          _confirmDelete(itemToEdit['id']);
+                        },
+                        child: const Text('Excluir', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                      ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.pop(context);
+                      },
+                      child: Text('Cancelar', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      ),
+                      onPressed: () async {
+                        HapticFeedback.lightImpact();
+                        final name = nameController.text.trim();
+                        final category = categoryController.text.trim();
+                        final priceText = priceController.text.trim().replaceAll(',', '.');
+
+                        setDialogState(() {
+                          hasErrorName = name.isEmpty;
+                          hasErrorCategory = category.isEmpty;
+                          hasErrorPrice = priceText.isEmpty || (double.tryParse(priceText) == null);
+                        });
+
+                        if (hasErrorName || hasErrorCategory || hasErrorPrice) {
+                          return;
+                        }
+
+                        Navigator.pop(context);
+                        await _submitItemData(
+                          id: itemToEdit?['id'],
+                          name: name,
+                          category: category,
+                          price: priceText,
+                          isAvaliable: isAvaliable,
+                          isEditing: isEditing,
+                        );
+                      },
+                      child: Text(isEditing ? 'Salvar' : 'Criar', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
                 );
               },
-              child: Text(isEditing ? 'Salvar' : 'Criar'),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
