@@ -13,11 +13,25 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  bool _showNavBar = true;
 
-  final List<Widget> _screens = [
-    const TelaCheckin(),
+  late final List<Widget> _screens = [
+
+    TelaCheckin(
+      onNavbarVisibilityChanged: (isVisible) {
+        setState(() {
+          _showNavBar = isVisible;
+        });
+      },
+    ),
     const Center(child: Text('Tela de Sessões')),
-    const TelaGestaoPulseiras(),
+    TelaGestaoPulseiras(
+      onNavbarVisibilityChanged: (isVisible) {
+        setState(() {
+          _showNavBar = isVisible;
+        });
+      },
+    ),
     const TelaMenu(),
   ];
 
@@ -30,13 +44,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: _showNavBar
+          ? NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (int index) {
           HapticFeedback.lightImpact();
+
+          if (_currentIndex == 0 && index != 0) {
+            TelaCheckin.resetarFluxo();
+          }
+
+
           if (_currentIndex == 2 && index != 2) {
             TelaGestaoPulseiras.resetarFluxo();
           }
+
           setState(() {
             _currentIndex = index;
           });
@@ -65,7 +87,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             label: 'Cardápio',
           ),
         ],
-      ),
+      )
+          : null,
     );
   }
 }

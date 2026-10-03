@@ -7,7 +7,12 @@ import 'nfc_radar_pulse.dart';
 final GlobalKey<_TelaGestaoPulseirasContentState> gestaoPulseirasKey = GlobalKey();
 
 class TelaGestaoPulseiras extends StatelessWidget {
-  const TelaGestaoPulseiras({super.key});
+  final ValueChanged<bool>? onNavbarVisibilityChanged;
+
+  const TelaGestaoPulseiras({
+    super.key,
+    this.onNavbarVisibilityChanged,
+  });
 
   static void resetarFluxo() {
     gestaoPulseirasKey.currentState?._resetFlow();
@@ -17,13 +22,21 @@ class TelaGestaoPulseiras extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => BraceletsController(),
-      child: _TelaGestaoPulseirasContent(key: gestaoPulseirasKey),
+      child: _TelaGestaoPulseirasContent(
+        key: gestaoPulseirasKey,
+        onNavbarVisibilityChanged: onNavbarVisibilityChanged,
+      ),
     );
   }
 }
 
 class _TelaGestaoPulseirasContent extends StatefulWidget {
-  const _TelaGestaoPulseirasContent({super.key});
+  final ValueChanged<bool>? onNavbarVisibilityChanged;
+
+  const _TelaGestaoPulseirasContent({
+    super.key,
+    this.onNavbarVisibilityChanged,
+  });
 
   @override
   State<_TelaGestaoPulseirasContent> createState() => _TelaGestaoPulseirasContentState();
@@ -54,6 +67,9 @@ class _TelaGestaoPulseirasContentState extends State<_TelaGestaoPulseirasContent
       _localErrorMessage = null;
       _isCheckingStatus = false;
     });
+
+    // Oculta a navbar do menu principal quando entra no fluxo NFC
+    widget.onNavbarVisibilityChanged?.call(false);
 
     final controller = context.read<BraceletsController>();
 
@@ -107,6 +123,9 @@ class _TelaGestaoPulseirasContentState extends State<_TelaGestaoPulseirasContent
         _isCheckingStatus = false;
         _localErrorMessage = null;
       });
+
+      // Restaura/mostra novamente a navbar quando voltar para o passo 1 (Menu)
+      widget.onNavbarVisibilityChanged?.call(true);
     }
   }
 
@@ -500,16 +519,13 @@ class _TelaGestaoPulseirasContentState extends State<_TelaGestaoPulseirasContent
                           : () async {
                         if (_scannedUid == null) return;
 
-
                         final errorMessage = await controller.deleteBracelet(_scannedUid!);
 
                         if (!mounted) return;
 
                         if (errorMessage == null) {
-
                           _restartScanning();
                         } else {
-
                           setState(() {
                             _localErrorMessage = errorMessage;
                           });
